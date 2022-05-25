@@ -315,7 +315,7 @@ double AIPlayer::MiniMax(const Parchis &actual, int jugador, int profundidad, co
     hijo = actual.generateNextMove(last_c_piece, last_id_piece, last_dice);
 
 
-    if(profundidad%2 == 0){      // Nodo MAX
+    if(/*profundidad%2 == 0*/ jugador == actual.getCurrentPlayerId()){      // Nodo MAX
         mejor = menosinf;       // Valor inicial para que se actualice con el mejor valor que encontremos
 
         while(!(hijo == actual)){
@@ -363,7 +363,7 @@ double AIPlayer::Poda_AlfaBeta(const Parchis &actual, int jugador, int profundid
     hijo = actual.generateNextMove(last_c_piece, last_id_piece, last_dice);
 
 
-    if(profundidad%2 == 0){      // Nodo MAX
+    if(/*profundidad%2 == 0*/jugador == actual.getCurrentPlayerId()){      // Nodo MAX
         while(!(hijo == actual)){
             valor = Poda_AlfaBeta(hijo, jugador, profundidad+1, profundidad_max, c_piece_n, id_piece_n, dice_n, alpha, beta, heuristic);
             if(valor > alpha){
@@ -392,6 +392,72 @@ double AIPlayer::Poda_AlfaBeta(const Parchis &actual, int jugador, int profundid
             hijo = actual.generateNextMove(last_c_piece, last_id_piece, last_dice);
         }
         return beta;
+    }
+}
+
+double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador) {
+    int ganador = estado.getWinner();
+    int oponente = (jugador + 1) % 2;
+
+    // Si hay un ganador, devuelvo más/menos infinito, según si he ganado yo o el oponente.
+    if (ganador == jugador)
+    {
+        return gana;
+    }
+    else if (ganador == oponente)
+    {
+        return pierde;
+    }
+    else
+    {
+        // Colores que juega mi jugador y colores del oponente
+        vector<color> my_colors = estado.getPlayerColors(jugador);
+        vector<color> op_colors = estado.getPlayerColors(oponente);
+
+        // Recorro todas las fichas de mi jugador
+        int puntuacion_jugador = 0;
+        // Recorro colores de mi jugador.
+        for (int i = 0; i < my_colors.size(); i++)
+        {
+            color c = my_colors[i];
+            // Recorro las fichas de ese color.
+            for (int j = 0; j < num_pieces; j++)
+            {
+                // Valoro positivamente que la ficha esté en casilla segura o meta.
+                if (estado.isSafePiece(c, j))
+                {
+                    puntuacion_jugador++;
+                }
+                else if (estado.getBoard().getPiece(c, j).type == home)
+                {
+                    puntuacion_jugador += 5;
+                }
+            }
+        }
+
+        // Recorro todas las fichas del oponente
+        int puntuacion_oponente = 0;
+        // Recorro colores del oponente.
+        for (int i = 0; i < op_colors.size(); i++)
+        {
+            color c = op_colors[i];
+            // Recorro las fichas de ese color.
+            for (int j = 0; j < num_pieces; j++)
+            {
+                if (estado.isSafePiece(c, j))
+                {
+                    // Valoro negativamente que la ficha esté en casilla segura o meta.
+                    puntuacion_oponente++;
+                }
+                else if (estado.getBoard().getPiece(c, j).type == home)
+                {
+                    puntuacion_oponente += 5;
+                }
+            }
+        }
+
+        // Devuelvo la puntuación de mi jugador menos la puntuación del oponente.
+        return puntuacion_jugador - puntuacion_oponente;
     }
 }
 

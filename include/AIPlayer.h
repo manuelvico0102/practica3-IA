@@ -89,5 +89,6 @@ class AIPlayer: public Player{
 
         double MiniMax(const Parchis &actual, int jugador, int profundidad, const int profundidad_max, color &c_piece, int &id_piece, int &dice, double (*heuristic)(const Parchis &, int)) const;
 
+        static double Mivaloracion1(const Parchis &estado, int jugador);
 };
 #endif
