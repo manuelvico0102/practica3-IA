@@ -22,7 +22,23 @@ bool AIPlayer::move(){
 }
 
 void AIPlayer::think(color & c_piece, int & id_piece, int & dice) const{
-    switch (id) {
+    // Si quiero poder manejar varias heurísticas, puedo usar la variable id del agente para usar una u otra.
+    double valor; // Almacena el valor con el que se etiqueta el estado tras el proceso de busqueda.
+    double alpha = menosinf, beta = masinf; // Cotas iniciales de la poda AlfaBeta
+    switch(id){
+        case 0:
+            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, ValoracionTest);
+            break;
+        case 1:
+            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, Mivaloracion1);
+            break;
+        case 2:
+            //valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, MiValoracion2);
+            break;
+    }
+    cout << "Valor MiniMax: " << valor << "  Accion: " << str(c_piece) << " " << id_piece << " " << dice << endl;
+
+    /* switch (id) {
         case 0:
             thinkAleatorio(c_piece, id_piece, dice);
             break;
@@ -45,7 +61,7 @@ void AIPlayer::think(color & c_piece, int & id_piece, int & dice) const{
             valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, ValoracionTest);
             cout << "Valor MiniMax: " << valor << "  Accion: " << str(c_piece) << " " << id_piece << " " << dice << endl;
             break;
-    }
+    }*/
 }
 
 void AIPlayer::thinkAleatorio(color &c_piece, int &id_piece, int &dice) const {
@@ -96,19 +112,7 @@ void AIPlayer::thinkAleatorio(color &c_piece, int &id_piece, int &dice) const {
 
     // ----------------------------------------------------------------- //
 
-    // Si quiero poder manejar varias heurísticas, puedo usar la variable id del agente para usar una u otra.
-    switch(id){
-        case 0:
-            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, ValoracionTest);
-            break;
-        case 1:
-            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, MiValoracion1);
-            break;
-        case 2:
-            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, MiValoracion2);
-            break;
-    }
-    cout << "Valor MiniMax: " << valor << "  Accion: " << str(c_piece) << " " << id_piece << " " << dice << endl;
+
 
     */
 }
@@ -420,18 +424,33 @@ double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador) {
         for (int i = 0; i < my_colors.size(); i++)
         {
             color c = my_colors[i];
+            color otro_c = my_colors[(i+1)%2];
             // Recorro las fichas de ese color.
             for (int j = 0; j < num_pieces; j++)
             {
-                // Valoro positivamente que la ficha esté en casilla segura o meta.
+
+                if(estado.isEatingMove())
+                    puntuacion_jugador += 20;
+
+                if(estado.getBoard().getPiece(c,j).type == goal)
+                    puntuacion_jugador += 15;
+
+                if(estado.getBoard().getPiece(c,j).type == final_queue)
+                    puntuacion_jugador += 10;
+
+                if (estado.getBoard().getPiece(c, j).type == home)
+                    // Valoro negativamente que la ficha esté en casa para que salga
+                    puntuacion_jugador -= 10;
+
                 if (estado.isSafePiece(c, j))
-                {
-                    puntuacion_jugador++;
+                    puntuacion_jugador +=5;
+
+                //Si no tengo un 6 lo valoro positivo, para que use el 6
+                vector<int> dados = estado.getAvailableDices(c);
+                if( find(dados.begin(), dados.end(), 6) == dados.end()){
+                    puntuacion_jugador += 15;
                 }
-                else if (estado.getBoard().getPiece(c, j).type == home)
-                {
-                    puntuacion_jugador += 5;
-                }
+
             }
         }
 
@@ -444,14 +463,21 @@ double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador) {
             // Recorro las fichas de ese color.
             for (int j = 0; j < num_pieces; j++)
             {
-                if (estado.isSafePiece(c, j))
+                if(estado.isEatingMove())
+                    puntuacion_oponente += 20;
+
+                if(estado.isGoalMove())
+                    puntuacion_oponente += 15;
+
+                if (estado.getBoard().getPiece(c, j).type == home)
                 {
                     // Valoro negativamente que la ficha esté en casilla segura o meta.
-                    puntuacion_oponente++;
+                    puntuacion_oponente -= 10;
                 }
-                else if (estado.getBoard().getPiece(c, j).type == home)
+
+                if (estado.isSafePiece(c, j))
                 {
-                    puntuacion_oponente += 5;
+                    puntuacion_oponente++;
                 }
             }
         }
