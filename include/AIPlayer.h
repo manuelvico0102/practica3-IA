@@ -78,17 +78,19 @@ class AIPlayer: public Player{
          * @param jugador Id del jugador actual (0 o 1)
          * @return double 
          */
-        static double ValoracionTest(const Parchis &estado, int jugador);
+        static double ValoracionTest(const Parchis &estado, int jugador, const Parchis actual);
 
         /**
          * @brief Propuesta de declaración de la función poda alfa-beta.
          * La propuesta es solo sugerencia, los parámetros de la declaración podrían variar.
          */
-        double Poda_AlfaBeta(const Parchis &actual, int jugador, int profundidad, int profundidad_max, color &c_piece, int &id_piece, int &dice, double alpha, double beta, double (*heuristic)(const Parchis &, int)) const;
+        double Poda_AlfaBeta(const Parchis &actual, int jugador, int profundidad, int profundidad_max, color &c_piece, int &id_piece, int &dice, double alpha, double beta, double (*heuristic)(const Parchis &, int, const Parchis)) const;
 
 
         double MiniMax(const Parchis &actual, int jugador, int profundidad, const int profundidad_max, color &c_piece, int &id_piece, int &dice, double (*heuristic)(const Parchis &, int)) const;
 
-        static double Mivaloracion1(const Parchis &estado, int jugador);
+        static double Mivaloracion1(const Parchis &estado, int jugador, const Parchis actual);
+
+        static double Mivaloracion2(const Parchis &estado, int jugador, const Parchis actual);
 };
 #endif

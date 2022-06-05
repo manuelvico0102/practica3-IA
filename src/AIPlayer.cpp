@@ -27,13 +27,13 @@ void AIPlayer::think(color & c_piece, int & id_piece, int & dice) const{
     double alpha = menosinf, beta = masinf; // Cotas iniciales de la poda AlfaBeta
     switch(id){
         case 0:
-            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, ValoracionTest);
-            break;
-        case 1:
             valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, Mivaloracion1);
             break;
+        case 1:
+            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, ValoracionTest);
+            break;
         case 2:
-            //valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, MiValoracion2);
+            valor = Poda_AlfaBeta(*actual, jugador, 0, PROFUNDIDAD_ALFABETA, c_piece, id_piece, dice, alpha, beta, Mivaloracion2);
             break;
     }
     cout << "Valor MiniMax: " << valor << "  Accion: " << str(c_piece) << " " << id_piece << " " << dice << endl;
@@ -230,7 +230,7 @@ void AIPlayer::thinkMejorOpcion(color &c_piece, int &id_piece, int &dice) const 
 
 
 
-double AIPlayer::ValoracionTest(const Parchis &estado, int jugador)
+double AIPlayer::ValoracionTest(const Parchis &estado, int jugador, const Parchis actual)
 {
     // Heurística de prueba proporcionada para validar el funcionamiento del algoritmo de búsqueda.
 
@@ -318,8 +318,7 @@ double AIPlayer::MiniMax(const Parchis &actual, int jugador, int profundidad, co
     int last_dice = -1;         // El dado que se usó en el último movimiento.
     hijo = actual.generateNextMove(last_c_piece, last_id_piece, last_dice);
 
-
-    if(/*profundidad%2 == 0*/ jugador == actual.getCurrentPlayerId()){      // Nodo MAX
+    if(/*profundidad%2 == 0 */jugador == actual.getCurrentPlayerId()){      // Nodo MAX
         mejor = menosinf;       // Valor inicial para que se actualice con el mejor valor que encontremos
 
         while(!(hijo == actual)){
@@ -350,9 +349,9 @@ double AIPlayer::MiniMax(const Parchis &actual, int jugador, int profundidad, co
 
 double AIPlayer::Poda_AlfaBeta(const Parchis &actual, int jugador, int profundidad, int profundidad_max, color &c_piece,
                                int &id_piece, int &dice, double alpha, double beta,
-                               double (*heuristic)(const Parchis &, int)) const {
+                               double (*heuristic)(const Parchis &, int, const Parchis)) const {
     if(profundidad == profundidad_max || actual.gameOver()){
-        return heuristic(actual, jugador);
+        return heuristic(actual, jugador,actual);
     }
 
     color c_piece_n;
@@ -364,8 +363,7 @@ double AIPlayer::Poda_AlfaBeta(const Parchis &actual, int jugador, int profundid
     color last_c_piece = none;  // El colo de la última ficha que se movió.
     int last_id_piece = -1;      // El id de la última ficha que se movió
     int last_dice = -1;         // El dado que se usó en el último movimiento.
-    hijo = actual.generateNextMove(last_c_piece, last_id_piece, last_dice);
-
+    hijo = actual.generateNextMoveDescending(last_c_piece, last_id_piece, last_dice);
 
     if(/*profundidad%2 == 0*/jugador == actual.getCurrentPlayerId()){      // Nodo MAX
         while(!(hijo == actual)){
@@ -376,9 +374,10 @@ double AIPlayer::Poda_AlfaBeta(const Parchis &actual, int jugador, int profundid
                 id_piece = last_id_piece;
                 dice = last_dice;
             }
-            if(beta <= alpha)
+            if(alpha >= beta)
                 break;      // Poda
-            hijo = actual.generateNextMove(last_c_piece, last_id_piece, last_dice);
+
+            hijo = actual.generateNextMoveDescending(last_c_piece, last_id_piece, last_dice);
         }
         return alpha;
     }else{      // Nodo MIN
@@ -393,13 +392,14 @@ double AIPlayer::Poda_AlfaBeta(const Parchis &actual, int jugador, int profundid
 
             if(beta <= alpha)
                 break;
-            hijo = actual.generateNextMove(last_c_piece, last_id_piece, last_dice);
+            hijo = actual.generateNextMoveDescending(last_c_piece, last_id_piece, last_dice);
         }
         return beta;
     }
 }
 
-double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador) {
+// 1-0 1-0 1-1
+double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador, const Parchis actual) {
     int ganador = estado.getWinner();
     int oponente = (jugador + 1) % 2;
 
@@ -428,13 +428,11 @@ double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador) {
             // Recorro las fichas de ese color.
             for (int j = 0; j < num_pieces; j++)
             {
-
-                if(estado.isEatingMove())
-                    puntuacion_jugador += 20;
-
+                //Tener ficha en la meta
                 if(estado.getBoard().getPiece(c,j).type == goal)
                     puntuacion_jugador += 15;
 
+                //Tener fichas en la cola
                 if(estado.getBoard().getPiece(c,j).type == final_queue)
                     puntuacion_jugador += 10;
 
@@ -442,18 +440,36 @@ double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador) {
                     // Valoro negativamente que la ficha esté en casa para que salga
                     puntuacion_jugador -= 10;
 
+                //Tener fichas en seguro
                 if (estado.isSafePiece(c, j))
                     puntuacion_jugador +=5;
 
-                //Si no tengo un 6 lo valoro positivo, para que use el 6
+                //Sacar fichas de casa
+                /*if(estado.piecesAtHome(c) < actual.piecesAtHome(c))
+                    puntuacion_jugador += 10;
+*/
+                //A partir de que falte 22 casillas priorizo mover esa ficha para meterla rápido
+                if(estado.distanceToGoal(c,j) < actual.distanceToGoal(c,j) && estado.distanceToGoal(c,j) < 22)
+                    puntuacion_jugador += 5;
+
+                //Meter ficha, y no puedo contarme 10 no aumento
+                if(estado.isGoalMove() && (estado.piecesAtHome(c)+estado.piecesAtGoal(c)) == 4 && estado.piecesAtGoal(c) != 4)
+                    puntuacion_jugador -= 15;
+
+                /*//Si no tengo un 6 lo valoro positivo, para que use el 6
                 vector<int> dados = estado.getAvailableDices(c);
                 if( find(dados.begin(), dados.end(), 6) == dados.end()){
                     puntuacion_jugador += 15;
-                }
+                }*/
 
             }
         }
 
+        //Si con este movimiento he comido
+        pair<color,int> comida = estado.eatenPiece();
+        if(comida.first == op_colors[0] || comida.first == op_colors[1])
+            puntuacion_jugador += 20;
+//-----------------------------------------------------------------------------------------------------------------
         // Recorro todas las fichas del oponente
         int puntuacion_oponente = 0;
         // Recorro colores del oponente.
@@ -463,29 +479,313 @@ double AIPlayer::Mivaloracion1(const Parchis &estado, int jugador) {
             // Recorro las fichas de ese color.
             for (int j = 0; j < num_pieces; j++)
             {
-                if(estado.isEatingMove())
-                    puntuacion_oponente += 20;
-
-                if(estado.isGoalMove())
+                //Tener ficha en la meta
+                if(estado.getBoard().getPiece(c,j).type == goal)
                     puntuacion_oponente += 15;
 
-                if (estado.getBoard().getPiece(c, j).type == home)
-                {
-                    // Valoro negativamente que la ficha esté en casilla segura o meta.
-                    puntuacion_oponente -= 10;
-                }
+                //Tener fichas en la cola
+                if(estado.getBoard().getPiece(c,j).type == final_queue)
+                    puntuacion_oponente += 10;
 
+                if (estado.getBoard().getPiece(c, j).type == home)
+                    // Valoro negativamente que la ficha esté en casa para que salga
+                    puntuacion_oponente -= 10;
+
+                //Tener fichas en seguro
                 if (estado.isSafePiece(c, j))
-                {
-                    puntuacion_oponente++;
-                }
+                    puntuacion_oponente +=5;
+
+                //Sacar fichas de casa
+                /*if(estado.piecesAtHome(c) < actual.piecesAtHome(c))
+                    puntuacion_jugador += 10;
+*/
+                //A partir de que falte 22 casillas priorizo mover esa casilla para meterla rápido
+                if(estado.distanceToGoal(c,j) < actual.distanceToGoal(c,j) && estado.distanceToGoal(c,j) < 22)
+                    puntuacion_oponente += 5;
+
+                //Meter ficha, y no puedo contarme 10 no aumento
+                if(estado.isGoalMove() && (estado.piecesAtHome(c)+estado.piecesAtGoal(c)) == 4 && estado.piecesAtGoal(c) != 4)
+                    puntuacion_oponente -= 15;
             }
         }
+        if(comida.first == my_colors[0] || comida.first == my_colors[1])
+            puntuacion_oponente += 20;
 
         // Devuelvo la puntuación de mi jugador menos la puntuación del oponente.
         return puntuacion_jugador - puntuacion_oponente;
     }
 }
+// Con muros -->  -   -  -
+// Sin muros -->  -   -  -
+/*double AIPlayer::Mivaloracion2(const Parchis &estado, int jugador, const Parchis actual) {
+    int ganador = estado.getWinner();
+    int oponente = (jugador + 1) % 2;
+
+    // Si hay un ganador, devuelvo más/menos infinito, según si he ganado yo o el oponente.
+    if (ganador == jugador)
+    {
+        return gana;
+    }
+    else if (ganador == oponente)
+    {
+        return pierde;
+    }
+    else
+    {
+        // Colores que juega mi jugador y colores del oponente
+        vector<color> my_colors = estado.getPlayerColors(jugador);
+        vector<color> op_colors = estado.getPlayerColors(oponente);
+
+        // Recorro todas las fichas de mi jugador
+        int puntuacion_jugador = 0;
+        // Recorro colores de mi jugador.
+        for (int i = 0; i < my_colors.size(); i++)
+        {
+            color c = my_colors[i];
+            color otro_c = my_colors[(i+1)%2];
+            // Recorro las fichas de ese color.
+            for (int j = 0; j < num_pieces; j++)
+            {
+                //Tener ficha en la meta
+                if(estado.getBoard().getPiece(c,j).type == goal)
+                    puntuacion_jugador += 15;
+
+                //Tener fichas en la cola
+                if(estado.getBoard().getPiece(c,j).type == final_queue)
+                    puntuacion_jugador += 10;
+
+                if (estado.getBoard().getPiece(c, j).type == home)
+                    // Valoro negativamente que la ficha esté en casa para que salga
+                    puntuacion_jugador -= 10;
+
+                //Tener fichas en seguro
+                if (estado.isSafePiece(c, j))
+                    puntuacion_jugador +=5;
+
+                //A partir de que falte 22 casillas priorizo mover esa ficha para meterla rápido
+                if(estado.distanceToGoal(c,j) < actual.distanceToGoal(c,j) && estado.distanceToGoal(c,j) < 22)
+                    puntuacion_jugador += 5;
+
+                //Meter ficha, y no puedo contarme 10 no aumento
+                if(estado.isGoalMove() && (estado.piecesAtHome(c)+estado.piecesAtGoal(c)) == 4 && estado.piecesAtGoal(c) != 4 &&
+                !(((estado.getBoard().getPiece(c, 0).type == goal) || (estado.getBoard().getPiece(c, 0).type == final_queue)) &&
+                ((estado.getBoard().getPiece(c, 1).type == goal) || (estado.getBoard().getPiece(c, 1).type == final_queue)) &&
+                ((estado.getBoard().getPiece(c, 2).type == goal) || (estado.getBoard().getPiece(c, 2).type == final_queue)) &&
+                ((estado.getBoard().getPiece(c, 3).type == goal) || (estado.getBoard().getPiece(c, 3).type == final_queue))))
+                    puntuacion_jugador -= 15;
+
+                //Si retrocedo casillas no muevo ficha
+                if(actual.distanceToGoal(c,j) < estado.distanceToGoal(c,j))
+                    puntuacion_jugador -= 20;
+
+                //Hacer muro
+                if(estado.isWall(estado.getBoard().getPiece(c,j)) == c)
+                    puntuacion_jugador += 10;
+            }
+            //Si con este movimiento he comido
+            pair<color,int> comida = estado.eatenPiece();
+            if(comida.first == op_colors[0] || comida.first == op_colors[1])
+                puntuacion_jugador += 20;
+            else if(comida.first == otro_c && estado.piecesAtGoal(c) > estado.piecesAtGoal(otro_c))
+                puntuacion_jugador += 15;
+            else if(comida.first == otro_c && estado.piecesAtGoal(c) < estado.piecesAtGoal(otro_c))
+                puntuacion_jugador -= 15;
+        }
 
 
+//-----------------------------------------------------------------------------------------------------------------
+        // Recorro todas las fichas del oponente
+        int puntuacion_oponente = 0;
+        // Recorro colores del oponente.
+        for (int i = 0; i < op_colors.size(); i++)
+        {
+            color c = op_colors[i];
+            color otro_c = op_colors[(i+1)%2];
+            // Recorro las fichas de ese color.
+            for (int j = 0; j < num_pieces; j++)
+            {
+                //Tener ficha en la meta
+                if(estado.getBoard().getPiece(c,j).type == goal)
+                    puntuacion_oponente += 15;
+
+                //Tener fichas en la cola
+                if(estado.getBoard().getPiece(c,j).type == final_queue)
+                    puntuacion_oponente += 10;
+
+                if (estado.getBoard().getPiece(c, j).type == home)
+                    // Valoro negativamente que la ficha esté en casa para que salga
+                    puntuacion_oponente -= 10;
+
+                //Tener fichas en seguro
+                if (estado.isSafePiece(c, j))
+                    puntuacion_oponente +=5;
+
+                //A partir de que falte 22 casillas priorizo mover esa casilla para meterla rápido
+                if(estado.distanceToGoal(c,j) < actual.distanceToGoal(c,j) && estado.distanceToGoal(c,j) < 22)
+                    puntuacion_oponente += 5;
+
+                //Meter ficha, y no puedo contarme 10 no aumento
+                if(estado.isGoalMove() && (estado.piecesAtHome(c)+estado.piecesAtGoal(c)) == 4 && estado.piecesAtGoal(c) != 4 &&
+                !(((estado.getBoard().getPiece(c, 0).type == goal) || (estado.getBoard().getPiece(c, 0).type == final_queue)) &&
+                ((estado.getBoard().getPiece(c, 1).type == goal) || (estado.getBoard().getPiece(c, 1).type == final_queue)) &&
+                ((estado.getBoard().getPiece(c, 2).type == goal) || (estado.getBoard().getPiece(c, 2).type == final_queue)) &&
+                ((estado.getBoard().getPiece(c, 3).type == goal) || (estado.getBoard().getPiece(c, 3).type == final_queue))))
+                    puntuacion_oponente -= 15;
+
+                //Si retrocedo casillas no muevo ficha
+                if(actual.distanceToGoal(c,j) < estado.distanceToGoal(c,j))
+                    puntuacion_oponente -= 15;
+
+                //Hacer muro
+                if(estado.isWall(estado.getBoard().getPiece(c,j)) == c)
+                    puntuacion_oponente += 10;
+            }
+            //Si con este movimiento he comido
+            pair<color,int> comida = estado.eatenPiece();
+            if(comida.first == op_colors[0] || comida.first == op_colors[1])
+                puntuacion_oponente += 20;
+            else if(comida.first == otro_c && (estado.piecesAtGoal(c) > estado.piecesAtGoal(otro_c)))
+                puntuacion_oponente += 15;
+            else if(comida.first == otro_c && (estado.piecesAtGoal(c) < estado.piecesAtGoal(otro_c)))
+                puntuacion_oponente -= 15;
+        }
+
+
+        // Devuelvo la puntuación de mi jugador menos la puntuación del oponente.
+        return puntuacion_jugador - puntuacion_oponente;
+    }
+}*/
+
+// -1  -0  -0
+double AIPlayer::Mivaloracion2(const Parchis &estado, int jugador, const Parchis actual) {
+    int ganador = estado.getWinner();
+    int oponente = (jugador + 1) % 2;
+
+    // Si hay un ganador, devuelvo más/menos infinito, según si he ganado yo o el oponente.
+    if (ganador == jugador)
+    {
+        return gana;
+    }
+    else if (ganador == oponente)
+    {
+        return pierde;
+    }
+    else
+    {
+        // Colores que juega mi jugador y colores del oponente
+        vector<color> my_colors = estado.getPlayerColors(jugador);
+        vector<color> op_colors = estado.getPlayerColors(oponente);
+
+        // Recorro todas las fichas de mi jugador
+        int puntuacion_jugador = 0;
+        // Recorro colores de mi jugador.
+        for (int i = 0; i < my_colors.size(); i++)
+        {
+            color c = my_colors[i];
+            color otro_c = my_colors[(i+1)%2];
+            // Recorro las fichas de ese color.
+            for (int j = 0; j < num_pieces; j++)
+            {
+                //Tener ficha en la meta
+                if(estado.getBoard().getPiece(c,j).type == goal)
+                    puntuacion_jugador += 15;
+
+                //Tener fichas en la cola
+                if(estado.getBoard().getPiece(c,j).type == final_queue)
+                    puntuacion_jugador += 10;
+
+                if (estado.getBoard().getPiece(c, j).type == home)
+                    // Valoro negativamente que la ficha esté en casa para que salga
+                    puntuacion_jugador -= 10;
+
+                //Tener fichas en seguro
+                if (estado.isSafePiece(c, j))
+                    puntuacion_jugador +=5;
+
+                //A partir de que falte 22 casillas priorizo mover esa ficha para meterla rápido
+                if(estado.distanceToGoal(c,j) < actual.distanceToGoal(c,j) && estado.distanceToGoal(c,j) < 22)
+                    puntuacion_jugador += 5;
+
+                //Meter ficha, y no puedo contarme 10 no aumento
+                if(estado.isGoalMove() && (estado.piecesAtHome(c)+estado.piecesAtGoal(c)) == 4 && estado.piecesAtGoal(c) != 4 &&
+                   !(((estado.getBoard().getPiece(c, 0).type == goal) || (estado.getBoard().getPiece(c, 0).type == final_queue)) &&
+                     ((estado.getBoard().getPiece(c, 1).type == goal) || (estado.getBoard().getPiece(c, 1).type == final_queue)) &&
+                     ((estado.getBoard().getPiece(c, 2).type == goal) || (estado.getBoard().getPiece(c, 2).type == final_queue)) &&
+                     ((estado.getBoard().getPiece(c, 3).type == goal) || (estado.getBoard().getPiece(c, 3).type == final_queue))))
+                    puntuacion_jugador -= 15;
+
+                //Si retrocedo casillas no muevo ficha
+                if(actual.distanceToGoal(c,j) < estado.distanceToGoal(c,j))
+                    puntuacion_jugador -= 20;
+
+            }
+            //Si con este movimiento he comido
+            pair<color,int> comida = estado.eatenPiece();
+            if(comida.first == op_colors[0] || comida.first == op_colors[1])
+                puntuacion_jugador += 30;
+            else if(comida.first == otro_c && estado.piecesAtGoal(c) >= estado.piecesAtGoal(otro_c))
+                puntuacion_jugador += 25;
+            else if(comida.first == otro_c && estado.piecesAtGoal(c) < estado.piecesAtGoal(otro_c))
+                puntuacion_jugador -= 15;
+        }
+
+
+//-----------------------------------------------------------------------------------------------------------------
+        // Recorro todas las fichas del oponente
+        int puntuacion_oponente = 0;
+        // Recorro colores del oponente.
+        for (int i = 0; i < op_colors.size(); i++)
+        {
+            color c = op_colors[i];
+            color otro_c = op_colors[(i+1)%2];
+            // Recorro las fichas de ese color.
+            for (int j = 0; j < num_pieces; j++)
+            {
+                //Tener ficha en la meta
+                if(estado.getBoard().getPiece(c,j).type == goal)
+                    puntuacion_oponente += 15;
+
+                //Tener fichas en la cola
+                if(estado.getBoard().getPiece(c,j).type == final_queue)
+                    puntuacion_oponente += 10;
+
+                if (estado.getBoard().getPiece(c, j).type == home)
+                    // Valoro negativamente que la ficha esté en casa para que salga
+                    puntuacion_oponente -= 10;
+
+                //Tener fichas en seguro
+                if (estado.isSafePiece(c, j))
+                    puntuacion_oponente +=5;
+
+                //A partir de que falte 22 casillas priorizo mover esa casilla para meterla rápido
+                if(estado.distanceToGoal(c,j) < actual.distanceToGoal(c,j) && estado.distanceToGoal(c,j) < 22)
+                    puntuacion_oponente += 5;
+
+                //Meter ficha, y no puedo contarme 10 no aumento
+                if(estado.isGoalMove() && (estado.piecesAtHome(c)+estado.piecesAtGoal(c)) == 4 && estado.piecesAtGoal(c) != 4 &&
+                   !(((estado.getBoard().getPiece(c, 0).type == goal) || (estado.getBoard().getPiece(c, 0).type == final_queue)) &&
+                     ((estado.getBoard().getPiece(c, 1).type == goal) || (estado.getBoard().getPiece(c, 1).type == final_queue)) &&
+                     ((estado.getBoard().getPiece(c, 2).type == goal) || (estado.getBoard().getPiece(c, 2).type == final_queue)) &&
+                     ((estado.getBoard().getPiece(c, 3).type == goal) || (estado.getBoard().getPiece(c, 3).type == final_queue))))
+                    puntuacion_oponente -= 15;
+
+                //Si retrocedo casillas no muevo ficha
+                if(actual.distanceToGoal(c,j) < estado.distanceToGoal(c,j))
+                    puntuacion_oponente -= 15;
+            }
+            //Si con este movimiento he comido
+            pair<color,int> comida = estado.eatenPiece();
+            if(comida.first == op_colors[0] || comida.first == op_colors[1])
+                puntuacion_oponente += 30;
+            else if(comida.first == otro_c && (estado.piecesAtGoal(c) >= estado.piecesAtGoal(otro_c)))
+                puntuacion_oponente += 25;
+            else if(comida.first == otro_c && (estado.piecesAtGoal(c) < estado.piecesAtGoal(otro_c)))
+                puntuacion_oponente -= 15;
+        }
+
+
+        // Devuelvo la puntuación de mi jugador menos la puntuación del oponente.
+        return puntuacion_jugador - puntuacion_oponente;
+    }
+}
 
